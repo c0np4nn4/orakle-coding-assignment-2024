@@ -46,7 +46,8 @@ export function createAndListNft(
     힌트: https://github.com/algorandfoundation/algokit-client-generator-ts/blob/main/docs/usage.md#create-calls
     */
     // 문제 6 시작
-    const createResult = '여기에 코드 작성'
+    // const createResult = '여기에 코드 작성'
+    const createResult = await nftmClient.create.bare()
     // 문제 6 끝
 
     /*
@@ -64,7 +65,7 @@ export function createAndListNft(
     이 추가 비용은 부트스트랩 호출 시 어토믹으로 묶여서 동시체결될 mbrTxn안에 extraFee를 통해서 설정할 수 있습니다.
     이때 extraFee는 AlgoAmount 데이터타입을 받습니다!! (그냥 숫자 넣으면 에러뜸)
 
-    알고랜드의 트랜잭션 비용은 0.001 Algos입니다.
+    알고랜드의 트랜잭션 비용은 0.001 Algos입니다. == 1000
 
     팁!
     Nft Markeplace 코드를 보고 bootstrap 메서드가 어떤 인수를 받는지 확인하고 진행하세요.
@@ -78,10 +79,15 @@ export function createAndListNft(
       sender,
       receiver: createResult.appAddress,
       amount: algokit.algos(0.1 + 0.1),
-      extraFee: '여기에 코드 작성',
+      extraFee: algokit.algos(1000),
     })
 
-    ;('여기에 코드 작성')
+    // ;('여기에 코드 작성')
+    await nftmClient.bootstrap({
+      asset: assetBeingSold,
+      unitaryPrice: unitaryPrice,
+      mbrPay: mbrTxn,
+    })
     // 문제 7 끝
 
     const sendAssetToSell = {
@@ -161,7 +167,7 @@ export function buyNft(
         assetId,
       })
       // 문제 8 시작
-      ;('여기에 코드 작성')
+      await nftmClient.compose().addTransaction(assetOptInTxn).buy({ buyerTxn: buyerTxn, quantity: quantity }).execute()
       // 문제 8 끝
 
       console.log(`${sender}가 에셋에 옵트인하고 구매했어요!`)
@@ -185,7 +191,8 @@ export function deleteAppAndWithdraw(nftmClient: NftMarketplaceClient, listClien
     앱을 삭제하고 수익금과 잔여 NFT를 회수하는 withdrawAndDelete 메서드를 호출하세요.
 
     withdrawAndDelete 메서드는 OnComplete Actions가 DeleteApplication으로 설정된 특별한 메서드입니다.
-    nftmClient에는 delete라는 property가 있습니다. 이 delete property 안에 withdrawAndDelete 메서드가 있으니 이 메서드를 호출하시면 됩니다.
+    nftmClient에는 delete라는 property가 있습니다.
+    이 delete property 안에 withdrawAndDelete 메서드가 있으니 이 메서드를 호출하시면 됩니다.
 
     앱 클라이언트로 withdrawAndDelete 같은 메서드를 호출할때 전달값을 두개 넣을 수 있습니다.
     1. ABI Arguments: 스마트계약 메서드 호출시 전달값을 넣는 곳입니다.
@@ -209,7 +216,8 @@ export function deleteAppAndWithdraw(nftmClient: NftMarketplaceClient, listClien
     */
 
     // 문제 9 시작
-    ;('여기에 코드 작성')
+    await nftmClient.delete.withdrawAndDelete({}, { sendParams: { fee: algokit.algos(0.003) } })
+
     // 문제 9 끝
 
     await listClient.removeMarketplaceFromList({ appId: BigInt(appId) })

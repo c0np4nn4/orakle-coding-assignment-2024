@@ -47,9 +47,9 @@ class NftMarketplace(arc4.ARC4Contract):
 
     def __init__(self) -> None:
         "문제 1 시작"
-        self.asset_id = "여기에 코드 작성"
-        self.unitary_price = "여기에 코드 작성"
-        self.bootstrapped = "여기에 코드 작성"
+        self.asset_id = UInt64(0)
+        self.unitary_price = UInt64(0)
+        self.bootstrapped = False
         "문제 1 끝"
 
     """
@@ -62,7 +62,7 @@ class NftMarketplace(arc4.ARC4Contract):
     함수 인수 설명:
     - asset: 판매할 에셋(ASA)의 정보를 담고 있는 Asset 타입의 인수입니다.
     - unitary_price: 판매할 에셋(ASA)의 단가를 나타내는 UInt64 타입의 인수입니다.
-    - mbr_pay: 앱 계정으로 어토믹 그룹에 묶여 동시다발적으로 보내지는 payment 트랜잭션입니다. 이 트랜잭션은 앱 배포자가 
+    - mbr_pay: 앱 계정으로 어토믹 그룹에 묶여 동시다발적으로 보내지는 payment 트랜잭션입니다. 이 트랜잭션은 앱 배포자가
                앱 계정의 미니멈 밸런스를 채우기 위한 트랜잭션입니다.
 
     # 1단계: assert로 bootstrap 호출 조건을 체크하세요.
@@ -71,7 +71,7 @@ class NftMarketplace(arc4.ARC4Contract):
     - mbr_pay 트랜잭션을 받는 계정이 앱 계정인지 체크하세요.
     - mbr_pay의 알고 송금량(amount)이 앱 계정의 미니멈 밸런스(0.1 알고)와 판매할 ASA에 옵트인하기
        위한 미니멈 밸런스(0.1 알고)의 합과 같은지 체크해야합니다.
-        -> 팁: Global AVM opcode는 min_balance, asset_opt_in_min_balance와 같은 여러 스마트 계약의 
+        -> 팁: Global AVM opcode는 min_balance, asset_opt_in_min_balance와 같은 여러 스마트 계약의
             전역 정보를 열람할 수 있습니다. 자세한 사항은 아래 힌트 1을 참고해주세요.
 
     # 2단계: bootstrap 메서드는 아래 기능들을 수행합니다.
@@ -82,7 +82,7 @@ class NftMarketplace(arc4.ARC4Contract):
        트랜잭션을 보내는 것이기 때문에 Inner Transaction을 사용해야합니다. 자세한 사항은 힌트
        2를 참고해주세요. 에셋에 옵트인하는 방법은 assetTransfer를 보낼때 0개의 에셋을 본인 계정으로
        보내면 됩니다. 즉, 여기서는 앱 계정이 자기 자신에게 0개의 에셋을 보내면 됩니다.
-       -> 힌트3에 나와있는 AssetTransfer 인수들 중 필수로 설정해야하는것들은 xfer_asset(보낼 에셋의 아이디), 
+       -> 힌트3에 나와있는 AssetTransfer 인수들 중 필수로 설정해야하는것들은 xfer_asset(보낼 에셋의 아이디),
           asset_receiver(받는 계정), asset_amount(에셋 송금량)입니다.
 
     힌트 1 - Global Opcode: https://algorandfoundation.github.io/puya/api-algopy.html#algopy.Global
@@ -97,7 +97,29 @@ class NftMarketplace(arc4.ARC4Contract):
     def bootstrap(
         self, asset: Asset, unitary_price: UInt64, mbr_pay: gtxn.PaymentTransaction
     ) -> None:
-        "여기에 코드 작성"
+        "1단계"
+        assert Txn.sender == Global.creator_address, "Txn sender must be creator addr"
+
+        assert self.bootstrapped == False, "global bootstrapped must be false"
+
+        assert (
+            mbr_pay.receiver == Global.current_application_address
+        ), "Deposit receiver must be the contract address"
+
+        assert (
+            mbr_pay.amount == Global.min_balance + Global.asset_opt_in_min_balance
+        ), "sender amount must be the sum of min_balance and min_balance for opt in"
+
+        "2단계"
+        self.asset_id = asset.id
+        self.unitary_price = unitary_price
+        self.bootstrapped = True
+
+        itxn.AssetTransfer(
+            xfer_asset=asset.id,
+            asset_amount=0,
+            asset_receiver=Global.current_application_address,
+        ).submit()
 
     "문제 2 끝"
 
@@ -105,7 +127,7 @@ class NftMarketplace(arc4.ARC4Contract):
     문제 3
     buy 메서드를 구현하세요.
 
-    buy 메서드는 앱에서 판매하는 에셋(ASA)을 구매할때 구매자가 호출하는 메서드입니다. 
+    buy 메서드는 앱에서 판매하는 에셋(ASA)을 구매할때 구매자가 호출하는 메서드입니다.
     구매자는 돈을 보내고 스마트 계약은 구매자에게 에셋(ASA)을 전송합니다.
 
     함수 인수 설명:
@@ -139,6 +161,32 @@ class NftMarketplace(arc4.ARC4Contract):
     ) -> None:
         "여기에 코드 작성"
 
+        """
+        - bootstrapped 글로벌 상태가 True인지 체크하세요. False라면 부트스트랩이 안된 상태입니다.
+        - buyer_txn의 sender가 Txn.sender와 같은지 체크해야합니다.
+        즉 buy 메서드를 호출한 계정과 payment 트랜잭션을 보낸 계정이 동일한지 체크합니다.
+        - buyer_txn의 receiver가 앱 계정 주소와 같은지 체크해야합니다.
+        즉 buy 메서드를 호출한 계정이 앱 계정에게 돈을 지불하는지 체크합니다.
+        - buyer_txn의 amount가 unitary_price(단가) 곱하기 quantity(수량)과 같은지 체크해야합니다.
+        즉 구매자가 지불한 금액이 정확한지 체크합니다.
+        """
+        assert self.bootstrapped == True, "Must be True"
+        assert buyer_txn.sender == Txn.sender, "Must be same"
+        assert buyer_txn.receiver == Global.current_application_address, "QWER"
+        assert buyer_txn.amount == self.unitary_price * quantity, "Must be same"
+
+        """
+        # 2단계: buy 메서드는 아래 기능들을 수행합니다.
+        1. 구매자에게 에셋(ASA)을 전송합니다. 이때 에셋의 수량은 quantity 전달값만큼 보냅니다.
+        이 또한 앱계정이 보내는 트랜잭션이니 Inner Transaction을 사용하세요!
+        """
+
+        itxn.AssetTransfer(
+            xfer_asset=self.asset_id,
+            asset_amount=quantity,
+            asset_receiver=buyer_txn.sender,
+        ).submit()
+
     "문제 3 끝"
 
     """
@@ -150,7 +198,7 @@ class NftMarketplace(arc4.ARC4Contract):
     스마트 계약을 삭제하는 메서드입니다.
 
     withdraw_and_delete 메서드는 OnComplete Action이 DeleteApplication인 메서드입니다.
-    즉, 이 메서드가 실행되고 난 후 스마트 계약이 삭제되게 됩니다. 그래서 decorator에 allow_actions=["DeleteApplication"]로 
+    즉, 이 메서드가 실행되고 난 후 스마트 계약이 삭제되게 됩니다. 그래서 decorator에 allow_actions=["DeleteApplication"]로
     설정이 된 것입니다.
 
     힌트 - Decorator: https://algorandfoundation.github.io/puya/lg-arc4.html#:~:text=%40arc4.abimethod(create%3DFalse%2C%20allow_actions%3D%5B%22NoOp%22%2C%20%22OptIn%22%5D%2C%20name%3D%22external_name%22)
@@ -158,7 +206,7 @@ class NftMarketplace(arc4.ARC4Contract):
     # 1단계: assert로 withdraw_and_delete 호출 조건을 체크하세요.
     - 메서드 호출자(Txn.sender)가 앱의 생성자(Global.creator_address)인지 체크해야합니다.
 
-    # 2단계: withdraw_and_delete 메서드는 아래 기능들을 수행합니다.
+    # 2단계: withdraw_and_delete j메서드는 아래 기능들을 수행합니다.
     1. 앱 계정에 있는 에셋(ASA)을 앱 호출자 계정으로 전송합니다. (AssetTransfer Transaction)
        이때 asset_close_to 패러미터를 앱 생성자(판매자)로 설정하여
        앱 계정에 남아있는 에셋 전부를 앱 생성자(판매자)에게 보냅니다.
@@ -170,7 +218,7 @@ class NftMarketplace(arc4.ARC4Contract):
 
     2. 앱 계정에 있는 모든 수익금을 앱 생성자(판매자) 계정으로 송금합니다. (Payment Transaction)
        이때 close_remainder_to 패러미터를 앱 생성자(판매자)로 설정하여 알고 전액(미니멈 밸런스 포함)을 앱
-       생성자(판매자)에게 보냅니다. close_remainder_to가 설정되어있기 때문에 amount를 설정하지 않으셔도 
+       생성자(판매자)에게 보냅니다. close_remainder_to가 설정되어있기 때문에 amount를 설정하지 않으셔도
        알고 전액이 송금됩니다.
     -> 설정해야할 설정값
         - receiver: 알고 송금을 받을 주소
@@ -187,6 +235,16 @@ class NftMarketplace(arc4.ARC4Contract):
 
     @arc4.abimethod(allow_actions=["DeleteApplication"])
     def withdraw_and_delete(self) -> None:
-        "여기에 코드 작성"
+        assert Txn.sender == Global.creator_address
+
+        itxn.AssetTransfer(
+            xfer_asset=self.asset_id,
+            asset_receiver=Txn.sender,
+            asset_close_to=Global.creator_address,
+        ).submit()
+
+        itxn.Payment(
+            receiver=Global.creator_address, close_remainder_to=Global.creator_address
+        ).submit()
 
     "문제 4 끝"
